@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.1.0](https://github.com/tonylea/helm-chart-sabnzbd/compare/v1.0.0...v1.1.0) (2026-11-23)
+
+### Features
+
+* let the incomplete folder be left out of the chown, for storage that refuses one ([5d74304](https://github.com/tonylea/helm-chart-sabnzbd/commit/5d74304c327035267d84a1a1db9d0cfe99bb6064))
+
 ## 1.0.0 (2026-11-23)
 
 ### Features

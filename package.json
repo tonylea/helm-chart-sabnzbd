@@ -1,6 +1,6 @@
 {
   "name": "helm-chart-sabnzbd",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Deploys SABnzbd, a Usenet download client",
   "private": true,
   "repository": {
