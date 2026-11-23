@@ -50,6 +50,7 @@ Every other container is non-root with all capabilities dropped.
 | `persistence.config.existingClaim` | none; required |
 | `persistence.incomplete.existingClaim` | none; required |
 | `persistence.incomplete.mountPath` | `/incomplete-downloads` |
+| `persistence.incomplete.chown` | `true`; set `false` where the storage refuses a chown, such as an NFS export that maps every user to one |
 | `persistence.media` | none; at least one mount required |
 | `persistence.media[].name` | required |
 | `persistence.media[].existingClaim` | none; required |

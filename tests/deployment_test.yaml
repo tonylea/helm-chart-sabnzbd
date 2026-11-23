@@ -126,6 +126,14 @@ tests:
             - name: incomplete
               mountPath: /incomplete-downloads
 
+  - it: leaves the incomplete folder out of the chown when told to
+    set:
+      persistence.incomplete.chown: false
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value: [chown, "1000:1000", /run, /config]
+
   - it: passes the time zone
     set:
       timezone: Europe/London
