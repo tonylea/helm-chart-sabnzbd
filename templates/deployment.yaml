@@ -25,7 +25,7 @@ spec:
       labels:
         {{- include "sabnzbd.podLabels" . | nindent 8 }}
       annotations:
-        checksum/settings: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/settings: {{ include "sabnzbd.settings" . | sha256sum }}
     spec:
       enableServiceLinks: false
       automountServiceAccountToken: false

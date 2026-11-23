@@ -3,22 +3,18 @@ release:
   name: sabnzbd
 templates:
   - templates/deployment.yaml
-  - templates/configmap.yaml
 values:
   - ../ci/kind-values.yaml
 tests:
   - it: runs one replica of the chart's appVersion, stopping the old pod first
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.replicas
           value: 1
       - equal:
-          template: templates/deployment.yaml
           path: spec.strategy.type
           value: Recreate
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].image
           value: lscr.io/linuxserver/sabnzbd:5.1.3-ls282
 
@@ -27,11 +23,9 @@ tests:
       image.tag: 5.1.2-ls281
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].image
           value: lscr.io/linuxserver/sabnzbd:5.1.2-ls281
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[1].image
           value: lscr.io/linuxserver/sabnzbd:5.1.2-ls281
 
@@ -41,7 +35,6 @@ tests:
       init.image.tag: "3.13"
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[1].image
           value: example.com/python:3.13
 
@@ -50,7 +43,6 @@ tests:
       version: 9.9.9
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.metadata.labels
           value:
             app.kubernetes.io/name: sabnzbd
@@ -60,7 +52,6 @@ tests:
   - it: runs non-root as 1000:1000 with the default seccomp profile
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.securityContext
           value:
             runAsNonRoot: true
@@ -69,11 +60,9 @@ tests:
             seccompProfile:
               type: RuntimeDefault
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.enableServiceLinks
           value: false
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.automountServiceAccountToken
           value: false
 
@@ -83,7 +72,6 @@ tests:
       gid: 100
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.securityContext
           value:
             runAsNonRoot: true
@@ -95,14 +83,12 @@ tests:
   - it: drops every capability and privilege escalation in both containers
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].securityContext
           value:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ALL]
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[1].securityContext
           value:
             allowPrivilegeEscalation: false
@@ -115,15 +101,12 @@ tests:
       gid: 100
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[0].name
           value: chown-volumes
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[0].command
           value: [chown, "1026:100", /run, /config, /incomplete-downloads]
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[0].securityContext
           value:
             runAsUser: 0
@@ -134,7 +117,6 @@ tests:
               drop: [ALL]
               add: [CHOWN]
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[0].volumeMounts
           value:
             - name: run
@@ -149,7 +131,6 @@ tests:
       timezone: Europe/London
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].env
           value:
             - name: TZ
@@ -158,7 +139,6 @@ tests:
   - it: gives the init container the keys, the login and each server's credentials from Secrets
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[1].env
           value:
             - name: API_KEY
@@ -197,7 +177,6 @@ tests:
       apiKey.secretKeyRef.name: ""
     asserts:
       - failedTemplate:
-          template: templates/deployment.yaml
           errorMessage: apiKey.secretKeyRef.name is required
 
   - it: fails without the login's password Secret
@@ -205,7 +184,6 @@ tests:
       login.password.secretKeyRef.name: ""
     asserts:
       - failedTemplate:
-          template: templates/deployment.yaml
           errorMessage: login.password.secretKeyRef.name is required
 
   - it: fails when a server has no password Secret
@@ -223,17 +201,14 @@ tests:
               key: p
     asserts:
       - failedTemplate:
-          template: templates/deployment.yaml
           errorMessage: "servers[0].password.secretKeyRef.name is required"
 
   - it: runs the init container before SABnzbd, with the settings, /config and the media mounts
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[1].command
           value: [/lsiopy/bin/python, /settings/apply-settings.py]
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[1].volumeMounts
           value:
             - name: settings
@@ -248,7 +223,6 @@ tests:
   - it: probes the version API
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].startupProbe
           value:
             httpGet:
@@ -257,22 +231,18 @@ tests:
             periodSeconds: 10
             failureThreshold: 30
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].livenessProbe.httpGet.path
           value: /api?mode=version
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
           value: /api?mode=version
 
   - it: leaves resources to whoever deploys it
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].resources
           value: {}
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.initContainers[1].resources
           value: {}
 
@@ -282,7 +252,6 @@ tests:
       resources.requests.memory: 768Mi
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].resources
           value:
             requests:
@@ -292,7 +261,6 @@ tests:
   - it: mounts /run, /config, the incomplete folder and each media mount at its own path
     asserts:
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].volumeMounts
           value:
             - name: run
@@ -306,7 +274,6 @@ tests:
             - name: media-library
               mountPath: /library
       - equal:
-          template: templates/deployment.yaml
           path: spec.template.spec.volumes
           value:
             - name: run
@@ -332,7 +299,6 @@ tests:
       persistence.incomplete.mountPath: /incomplete
     asserts:
       - contains:
-          template: templates/deployment.yaml
           path: spec.template.spec.containers[0].volumeMounts
           content:
             name: incomplete
@@ -343,7 +309,6 @@ tests:
       persistence.config.existingClaim: ""
     asserts:
       - failedTemplate:
-          template: templates/deployment.yaml
           errorMessage: persistence.config.existingClaim is required
 
   - it: fails without the incomplete claim
@@ -351,7 +316,6 @@ tests:
       persistence.incomplete.existingClaim: ""
     asserts:
       - failedTemplate:
-          template: templates/deployment.yaml
           errorMessage: persistence.incomplete.existingClaim is required
 
   - it: fails when a media mount has no name
@@ -361,7 +325,6 @@ tests:
           mountPath: /media
     asserts:
       - failedTemplate:
-          template: templates/deployment.yaml
           errorMessage: each persistence.media mount needs a name
 
   - it: fails when a media mount has no claim
@@ -371,5 +334,4 @@ tests:
           mountPath: /media
     asserts:
       - failedTemplate:
-          template: templates/deployment.yaml
           errorMessage: persistence.media mount downloads needs an existingClaim
