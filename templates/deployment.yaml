@@ -46,7 +46,9 @@ spec:
             - "{{ .Values.uid }}:{{ .Values.gid }}"
             - /run
             - /config
+            {{- if .Values.persistence.incomplete.chown }}
             - {{ .Values.persistence.incomplete.mountPath }}
+            {{- end }}
           securityContext:
             runAsUser: 0
             runAsGroup: 0
