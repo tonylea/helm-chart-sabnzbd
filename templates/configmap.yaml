@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "sabnzbd.labels" . | nindent 4 }}
+data:
+  settings.json: {{ include "sabnzbd.settings" . | quote }}
+  apply-settings.py: |
+    {{- .Files.Get "files/apply-settings.py" | nindent 4 }}

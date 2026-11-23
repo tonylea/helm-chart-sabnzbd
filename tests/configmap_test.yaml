@@ -1,0 +1,117 @@
+suite: ConfigMap
+release:
+  name: sabnzbd
+templates:
+  - templates/configmap.yaml
+values:
+  - ../ci/kind-values.yaml
+tests:
+  - it: holds the settings the init container applies
+    asserts:
+      - equal:
+          path: data["settings.json"]
+          value: '{"cacheLimit":"500M","categories":[{"dir":"tv","name":"tv","pp":"","priority":-100,"script":"Default"},{"dir":"movies","name":"movies","pp":"","priority":-100,"script":"Default"},{"dir":"music","name":"music","pp":"","priority":-100,"script":"Default"},{"dir":"books","name":"books","pp":"","priority":-100,"script":"Default"},{"dir":"comics","name":"comics","pp":"","priority":-100,"script":"Default"}],"completeDir":"/media/downloads","downloadDir":"/incomplete-downloads","servers":[{"connections":8,"enable":true,"host":"news.example.com","name":"provider","port":563,"ssl":true}]}'
+
+  - it: ships the script that edits sabnzbd.ini
+    asserts:
+      - matchRegex:
+          path: data["apply-settings.py"]
+          pattern: ConfigObj\("/config/sabnzbd.ini"
+
+  - it: writes a category's dir as given, so completed downloads can land on another mount
+    set:
+      categories:
+        - name: tv
+        - name: movies
+          dir: /library/movies
+    asserts:
+      - matchRegex:
+          path: data["settings.json"]
+          pattern: '"categories":\[\{"dir":"tv","name":"tv".*\{"dir":"/library/movies","name":"movies"'
+
+  - it: takes a server's own port, SSL, connections and enable
+    set:
+      servers:
+        - name: provider
+          host: news.example.com
+          port: 119
+          ssl: false
+          connections: 20
+          enable: false
+          username:
+            secretKeyRef:
+              name: sabnzbd
+              key: u
+          password:
+            secretKeyRef:
+              name: sabnzbd
+              key: p
+    asserts:
+      - matchRegex:
+          path: data["settings.json"]
+          pattern: '"servers":\[\{"connections":20,"enable":false,"host":"news.example.com","name":"provider","port":119,"ssl":false\}\]'
+
+  - it: takes a category's own priority, script and post-processing
+    set:
+      categories:
+        - name: tv
+          pp: D
+          script: cleanup.py
+          priority: 0
+    asserts:
+      - matchRegex:
+          path: data["settings.json"]
+          pattern: '"categories":\[\{"dir":"tv","name":"tv","pp":"D","priority":0,"script":"cleanup.py"\}\]'
+
+  - it: has no servers by default
+    set:
+      servers: []
+    asserts:
+      - matchRegex:
+          path: data["settings.json"]
+          pattern: '"servers":\[\]'
+
+  - it: fails without a media mount
+    set:
+      persistence.media: []
+    asserts:
+      - failedTemplate:
+          errorMessage: persistence.media needs at least one mount
+
+  - it: fails without completeDir
+    set:
+      completeDir: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: completeDir is required
+
+  - it: fails when completeDir is on no media mount
+    set:
+      completeDir: /elsewhere/downloads
+    asserts:
+      - failedTemplate:
+          errorMessage: completeDir must be on one of the persistence.media mounts
+
+  - it: accepts completeDir on the mount's own path
+    set:
+      completeDir: /library
+    asserts:
+      - matchRegex:
+          path: data["settings.json"]
+          pattern: '"completeDir":"/library"'
+
+  - it: fails when a server has no host
+    set:
+      servers:
+        - name: provider
+    asserts:
+      - failedTemplate:
+          errorMessage: server provider needs a host
+
+  - it: fails when a category has no name
+    set:
+      categories:
+        - dir: /library/tv
+    asserts:
+      - failedTemplate:
+          errorMessage: each category needs a name

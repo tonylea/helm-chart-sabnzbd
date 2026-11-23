@@ -1,0 +1,61 @@
+image:
+  tag: ""
+
+init:
+  image:
+    repository: lscr.io/linuxserver/sabnzbd
+    tag: ""
+  resources: {}
+
+uid: 1000
+gid: 1000
+
+timezone: UTC
+
+cacheLimit: 500M
+
+apiKey:
+  secretKeyRef:
+    name: ""
+    key: api-key
+
+nzbKey:
+  secretKeyRef:
+    name: ""
+    key: nzb-key
+
+login:
+  username:
+    secretKeyRef:
+      name: ""
+      key: username
+  password:
+    secretKeyRef:
+      name: ""
+      key: password
+
+servers: []
+
+categories:
+  - name: tv
+  - name: movies
+  - name: music
+  - name: books
+  - name: comics
+
+completeDir: ""
+
+persistence:
+  config:
+    existingClaim: ""
+  incomplete:
+    existingClaim: ""
+    mountPath: /incomplete-downloads
+  media: []
+
+resources: {}
+
+httpRoute:
+  enabled: false
+  parentRefs: []
+  hostnames: []

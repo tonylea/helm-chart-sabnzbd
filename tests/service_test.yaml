@@ -1,0 +1,19 @@
+suite: Service
+release:
+  name: sabnzbd
+templates:
+  - templates/service.yaml
+tests:
+  - it: exposes SABnzbd's port to the pod's selector labels
+    asserts:
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/name: sabnzbd
+            app.kubernetes.io/instance: sabnzbd
+      - equal:
+          path: spec.ports
+          value:
+            - name: http
+              port: 8080
+              targetPort: http
