@@ -34,12 +34,36 @@ spec:
         runAsNonRoot: true
         runAsUser: {{ .Values.uid }}
         runAsGroup: {{ .Values.gid }}
-        {{- with .Values.fsGroup }}
-        fsGroup: {{ . }}
-        {{- end }}
         seccompProfile:
           type: RuntimeDefault
       initContainers:
+        # s6 refuses to start unless /run is owned by the running UID, and an emptyDir is root-owned.
+        # Root is limited to this container, which only chowns the tops of the volumes and exits.
+        - name: chown-volumes
+          image: "{{ .Values.init.image.repository }}:{{ .Values.init.image.tag | default .Values.image.tag | default .Chart.AppVersion }}"
+          command:
+            - chown
+            - "{{ .Values.uid }}:{{ .Values.gid }}"
+            - /run
+            - /config
+            - {{ .Values.persistence.incomplete.mountPath }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [CHOWN]
+          resources:
+            {{- toYaml .Values.init.resources | nindent 12 }}
+          volumeMounts:
+            - name: run
+              mountPath: /run
+            - name: config
+              mountPath: /config
+            - name: incomplete
+              mountPath: {{ .Values.persistence.incomplete.mountPath }}
         - name: apply-settings
           image: "{{ .Values.init.image.repository }}:{{ .Values.init.image.tag | default .Values.image.tag | default .Chart.AppVersion }}"
           command: [/lsiopy/bin/python, /settings/apply-settings.py]

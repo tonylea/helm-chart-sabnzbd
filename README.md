@@ -8,6 +8,8 @@ The chart is opinionated: the keys, the login, the Usenet servers, the categorie
 It runs one replica, and stops the old pod before starting the new one, since SABnzbd keeps its queue and history in SQLite and a second pod would fail to attach the volume or corrupt the database.
 SABnzbd keeps its data in `/config`, its unfinished jobs in the incomplete folder, and its finished ones on the media volumes.
 It runs non-root in LinuxServer's non-root mode, with an `emptyDir` on `/run`.
+Because s6 refuses to start unless `/run` is owned by the running UID, a first init container runs as root with only the `CHOWN` capability, chowns `/run`, `/config` and the incomplete folder (not recursively) to `uid` and `gid`, and exits.
+Every other container is non-root with all capabilities dropped.
 
 ## Values
 
@@ -19,7 +21,6 @@ It runs non-root in LinuxServer's non-root mode, with an `emptyDir` on `/run`.
 | `init.resources` | none |
 | `uid` | `1000` |
 | `gid` | `1000` |
-| `fsGroup` | none |
 | `timezone` | `UTC` |
 | `cacheLimit` | `500M` |
 | `apiKey.secretKeyRef.name` | none; required |
@@ -81,8 +82,8 @@ With a login set, SABnzbd skips its hostname check, so `host_whitelist` is left 
 
 - Secrets holding the API key, the NZB key, the UI login and each server's login, with the keys named in the values.
 - Existing claims for `/config`, for the incomplete folder and for each media mount.
-  Each must be writable by `uid` and `gid`, because in non-root mode the image doesn't fix ownership.
-  Where the storage can't be made writable that way, set `fsGroup`.
+  The media claims must be writable by `uid` and `gid`, because in non-root mode the image doesn't fix ownership.
+  The chart chowns only the tops of `/config` and the incomplete folder.
 - `completeDir` on a media mount, and each mount at the same path in every pod that reads the files, so the apps that ask SABnzbd where a download is can find it.
   The [Servarr wiki](https://wiki.servarr.com/docker-guide) covers when an import can be a hardlink rather than a copy.
 - The Gateway API's `HTTPRoute` CRD, when `httpRoute.enabled` is set.
