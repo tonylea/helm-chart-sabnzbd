@@ -27,10 +27,10 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Kubernetes and Helm versions, [what the chart depends on, such as the storage behind /config or the Postgres version], and the image tag if it isn't the chart's appVersion.
+      description: Kubernetes and Helm versions, the storage behind /config, the incomplete folder and the media volume, and the image tag if it isn't the chart's appVersion.
   - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: Relevant output from the pod's app-name container. Remove anything secret first, such as API keys and passwords.
+      description: Relevant output from the pod's sabnzbd container. Remove anything secret first, such as API keys and passwords.
       render: text

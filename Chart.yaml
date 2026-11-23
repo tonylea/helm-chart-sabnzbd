@@ -1,0 +1,10 @@
+apiVersion: v2
+name: sabnzbd
+description: Deploys SABnzbd, a Usenet download client
+type: application
+version: 1.0.0
+appVersion: "5.1.3-ls282"
+home: https://github.com/tonylea/helm-chart-sabnzbd
+sources:
+  - https://github.com/sabnzbd/sabnzbd
+  - https://github.com/linuxserver/docker-sabnzbd

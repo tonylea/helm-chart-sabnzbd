@@ -1,0 +1,139 @@
+{{- $configClaim := required "persistence.config.existingClaim is required" .Values.persistence.config.existingClaim }}
+{{- $incompleteClaim := required "persistence.incomplete.existingClaim is required" .Values.persistence.incomplete.existingClaim }}
+{{- range .Values.persistence.media }}
+{{- if not .name }}
+{{- fail "each persistence.media mount needs a name" }}
+{{- end }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "sabnzbd.labels" . | nindent 4 }}
+spec:
+  # SABnzbd keeps its queue and history in SQLite, so the old pod stops before the new one starts.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "sabnzbd.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sabnzbd.podLabels" . | nindent 8 }}
+      annotations:
+        checksum/settings: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      # LinuxServer's non-root mode: PUID and PGID do nothing, and the image no longer fixes volume ownership.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.uid }}
+        runAsGroup: {{ .Values.gid }}
+        {{- with .Values.fsGroup }}
+        fsGroup: {{ . }}
+        {{- end }}
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: apply-settings
+          image: "{{ .Values.init.image.repository }}:{{ .Values.init.image.tag | default .Values.image.tag | default .Chart.AppVersion }}"
+          command: [/lsiopy/bin/python, /settings/apply-settings.py]
+          env:
+            - name: API_KEY
+              valueFrom:
+                {{- include "sabnzbd.secretKeyRef" (list "apiKey" .Values.apiKey) | nindent 16 }}
+            - name: NZB_KEY
+              valueFrom:
+                {{- include "sabnzbd.secretKeyRef" (list "nzbKey" .Values.nzbKey) | nindent 16 }}
+            - name: UI_USERNAME
+              valueFrom:
+                {{- include "sabnzbd.secretKeyRef" (list "login.username" .Values.login.username) | nindent 16 }}
+            - name: UI_PASSWORD
+              valueFrom:
+                {{- include "sabnzbd.secretKeyRef" (list "login.password" .Values.login.password) | nindent 16 }}
+            {{- range $i, $server := .Values.servers }}
+            - name: SERVER_{{ $i }}_USERNAME
+              valueFrom:
+                {{- include "sabnzbd.secretKeyRef" (list (printf "servers[%d].username" $i) $server.username) | nindent 16 }}
+            - name: SERVER_{{ $i }}_PASSWORD
+              valueFrom:
+                {{- include "sabnzbd.secretKeyRef" (list (printf "servers[%d].password" $i) $server.password) | nindent 16 }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.init.resources | nindent 12 }}
+          volumeMounts:
+            - name: settings
+              mountPath: /settings
+            - name: config
+              mountPath: /config
+            {{- range .Values.persistence.media }}
+            - name: media-{{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
+      containers:
+        - name: sabnzbd
+          image: "lscr.io/linuxserver/sabnzbd:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          env:
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          startupProbe:
+            httpGet:
+              path: /api?mode=version
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /api?mode=version
+              port: http
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api?mode=version
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: run
+              mountPath: /run
+            - name: config
+              mountPath: /config
+            - name: incomplete
+              mountPath: {{ .Values.persistence.incomplete.mountPath }}
+            {{- range .Values.persistence.media }}
+            - name: media-{{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: settings
+          configMap:
+            name: {{ .Release.Name }}
+        - name: config
+          persistentVolumeClaim:
+            claimName: {{ $configClaim }}
+        - name: incomplete
+          persistentVolumeClaim:
+            claimName: {{ $incompleteClaim }}
+        {{- range .Values.persistence.media }}
+        - name: media-{{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ required (printf "persistence.media mount %s needs an existingClaim" .name) .existingClaim }}
+        {{- end }}

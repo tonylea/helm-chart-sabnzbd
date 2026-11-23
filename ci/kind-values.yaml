@@ -1,0 +1,37 @@
+apiKey:
+  secretKeyRef:
+    name: sabnzbd
+nzbKey:
+  secretKeyRef:
+    name: sabnzbd
+login:
+  username:
+    secretKeyRef:
+      name: sabnzbd
+  password:
+    secretKeyRef:
+      name: sabnzbd
+servers:
+  - name: provider
+    host: news.example.com
+    username:
+      secretKeyRef:
+        name: sabnzbd
+        key: server-username
+    password:
+      secretKeyRef:
+        name: sabnzbd
+        key: server-password
+completeDir: /media/downloads
+persistence:
+  config:
+    existingClaim: config
+  incomplete:
+    existingClaim: incomplete
+  media:
+    - name: downloads
+      existingClaim: media
+      mountPath: /media
+    - name: library
+      existingClaim: library
+      mountPath: /library

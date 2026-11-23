@@ -1,0 +1,308 @@
+suite: Deployment
+release:
+  name: sabnzbd
+templates:
+  - templates/deployment.yaml
+values:
+  - ../ci/kind-values.yaml
+tests:
+  - it: runs one replica of the chart's appVersion, stopping the old pod first
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: lscr.io/linuxserver/sabnzbd:5.1.3-ls282
+
+  - it: uses the image tag when one is set, for the init container too
+    set:
+      image.tag: 5.1.2-ls281
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: lscr.io/linuxserver/sabnzbd:5.1.2-ls281
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: lscr.io/linuxserver/sabnzbd:5.1.2-ls281
+
+  - it: takes the init container's own image when set
+    set:
+      init.image.repository: example.com/python
+      init.image.tag: "3.13"
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: example.com/python:3.13
+
+  - it: leaves the chart's version off the pod, so a chart-only release doesn't restart it
+    chart:
+      version: 9.9.9
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels
+          value:
+            app.kubernetes.io/name: sabnzbd
+            app.kubernetes.io/instance: sabnzbd
+            app.kubernetes.io/version: 5.1.3-ls282
+
+  - it: runs non-root as 1000:1000 with the default seccomp profile
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+      - equal:
+          path: spec.template.spec.enableServiceLinks
+          value: false
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: takes the user, group and fsGroup from values
+    set:
+      uid: 1026
+      gid: 100
+      fsGroup: 100
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            runAsNonRoot: true
+            runAsUser: 1026
+            runAsGroup: 100
+            fsGroup: 100
+            seccompProfile:
+              type: RuntimeDefault
+
+  - it: drops every capability and privilege escalation in both containers
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+
+  - it: passes the time zone
+    set:
+      timezone: Europe/London
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: TZ
+              value: Europe/London
+
+  - it: gives the init container the keys, the login and each server's credentials from Secrets
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].env
+          value:
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sabnzbd
+                  key: api-key
+            - name: NZB_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sabnzbd
+                  key: nzb-key
+            - name: UI_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sabnzbd
+                  key: username
+            - name: UI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sabnzbd
+                  key: password
+            - name: SERVER_0_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sabnzbd
+                  key: server-username
+            - name: SERVER_0_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sabnzbd
+                  key: server-password
+
+  - it: fails without the API key's Secret
+    set:
+      apiKey.secretKeyRef.name: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: apiKey.secretKeyRef.name is required
+
+  - it: fails without the login's password Secret
+    set:
+      login.password.secretKeyRef.name: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: login.password.secretKeyRef.name is required
+
+  - it: fails when a server has no password Secret
+    set:
+      servers:
+        - name: provider
+          host: news.example.com
+          username:
+            secretKeyRef:
+              name: sabnzbd
+              key: u
+          password:
+            secretKeyRef:
+              name: ""
+              key: p
+    asserts:
+      - failedTemplate:
+          errorMessage: "servers[0].password.secretKeyRef.name is required"
+
+  - it: runs the init container before SABnzbd, with the settings, /config and the media mounts
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value: [/lsiopy/bin/python, /settings/apply-settings.py]
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          value:
+            - name: settings
+              mountPath: /settings
+            - name: config
+              mountPath: /config
+            - name: media-downloads
+              mountPath: /media
+            - name: media-library
+              mountPath: /library
+
+  - it: probes the version API
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe
+          value:
+            httpGet:
+              path: /api?mode=version
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /api?mode=version
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /api?mode=version
+
+  - it: leaves resources to whoever deploys it
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value: {}
+      - equal:
+          path: spec.template.spec.initContainers[0].resources
+          value: {}
+
+  - it: uses the resources when set
+    set:
+      resources.requests.cpu: 100m
+      resources.requests.memory: 768Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            requests:
+              cpu: 100m
+              memory: 768Mi
+
+  - it: mounts /run, /config, the incomplete folder and each media mount at its own path
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: run
+              mountPath: /run
+            - name: config
+              mountPath: /config
+            - name: incomplete
+              mountPath: /incomplete-downloads
+            - name: media-downloads
+              mountPath: /media
+            - name: media-library
+              mountPath: /library
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: run
+              emptyDir: {}
+            - name: settings
+              configMap:
+                name: sabnzbd
+            - name: config
+              persistentVolumeClaim:
+                claimName: config
+            - name: incomplete
+              persistentVolumeClaim:
+                claimName: incomplete
+            - name: media-downloads
+              persistentVolumeClaim:
+                claimName: media
+            - name: media-library
+              persistentVolumeClaim:
+                claimName: library
+
+  - it: mounts the incomplete folder at the path given
+    set:
+      persistence.incomplete.mountPath: /incomplete
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: incomplete
+            mountPath: /incomplete
+
+  - it: fails without the config claim
+    set:
+      persistence.config.existingClaim: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: persistence.config.existingClaim is required
+
+  - it: fails without the incomplete claim
+    set:
+      persistence.incomplete.existingClaim: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: persistence.incomplete.existingClaim is required
+
+  - it: fails when a media mount has no name
+    set:
+      persistence.media:
+        - existingClaim: media
+          mountPath: /media
+    asserts:
+      - failedTemplate:
+          errorMessage: each persistence.media mount needs a name
+
+  - it: fails when a media mount has no claim
+    set:
+      persistence.media:
+        - name: downloads
+          mountPath: /media
+    asserts:
+      - failedTemplate:
+          errorMessage: persistence.media mount downloads needs an existingClaim
