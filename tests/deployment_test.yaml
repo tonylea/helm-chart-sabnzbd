@@ -77,7 +77,7 @@ tests:
             runAsNonRoot: true
             runAsUser: 1026
             runAsGroup: 100
-                  seccompProfile:
+            seccompProfile:
               type: RuntimeDefault
 
   - it: drops every capability and privilege escalation in both containers
