@@ -3,6 +3,10 @@ release:
   name: sabnzbd
 templates:
   - templates/deployment.yaml
+  - templates/configmap.yaml
+documentSelector:
+  path: kind
+  value: Deployment
 values:
   - ../ci/kind-values.yaml
 tests:
